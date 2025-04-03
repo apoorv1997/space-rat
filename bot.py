@@ -222,6 +222,7 @@ class Bot:
             return abs(a.row - b.row) + abs(a.col - b.col)
 
         frontier = []
+        counter = 0
         heappush(frontier, (0, start))
         came_from = {start: None}
         cost_so_far = {start: 0}
@@ -241,7 +242,8 @@ class Bot:
                     if neighbor not in cost_so_far or new_cost < cost_so_far[neighbor]:
                         cost_so_far[neighbor] = new_cost
                         priority = new_cost + heuristic(neighbor, target)
-                        heappush(frontier, (priority, neighbor))
+                        print(f"priority value {priority}")
+                        heappush(frontier, (priority, neighbor))    
                         came_from[neighbor] = current
 
         path = []

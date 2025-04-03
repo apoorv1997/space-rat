@@ -53,8 +53,8 @@ def draw_bot(screen, bot):
                             CELL_SIZE - 10, CELL_SIZE - 10))
     
     if bot.current_location:
-        print(f" cell value {bot.current_location}")
-        print(f"cell type {dir(bot.current_location)}")
+        # print(f" cell value {bot.current_location}")
+        # print(f"cell type {dir(bot.current_location)}")
         i, j = bot.current_location.row, bot.current_location.col
         pygame.draw.rect(screen, BLUE, 
                         (MARGIN + j * CELL_SIZE + 2, 
