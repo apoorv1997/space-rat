@@ -14,10 +14,10 @@ class Bot:
         self.initialize_rat_probabilities()
         
         # Ensure bot and rat start at different locations
-        self.current_location = random.choice(ship.open_cells)
-        self.rat_location = random.choice(ship.open_cells)
+        self.current_location = random.choice(self.ship.open_cells)
+        self.rat_location = random.choice(self.ship.open_cells)
         while self.manhattan_distance(self.current_location, self.rat_location) < 5:
-            self.rat_location = random.choice(ship.open_cells)
+            self.rat_location = random.choice(self.ship.open_cells)
             
         self.actions_taken = {
             'movements': 0,
@@ -39,25 +39,25 @@ class Bot:
         for cell in self.ship.open_cells:
             self.rat_probabilities[cell] = prob
     
-    def count_blocked_neighbors(self, cell):
-        """Count how many of the 8 neighboring cells are blocked"""
-        x, y = cell
-        blocked = 0
-        for dx in [-1, 0, 1]:
-            for dy in [-1, 0, 1]:
-                if dx == 0 and dy == 0:
-                    continue
-                nx, ny = x + dx, y + dy
-                if (nx < 0 or nx >= self.ship.dimension or 
-                    ny < 0 or ny >= self.ship.dimension or 
-                    self.ship.grid[nx, ny] == 1):
-                    blocked += 1
-        return blocked
+    # def count_blocked_neighbors(self, cell):
+    #     """Count how many of the 8 neighboring cells are blocked"""
+    #     x, y = cell
+    #     blocked = 0
+    #     for dx in [-1, 0, 1]:
+    #         for dy in [-1, 0, 1]:
+    #             if dx == 0 and dy == 0:
+    #                 continue
+    #             nx, ny = x + dx, y + dy
+    #             if (nx < 0 or nx >= self.ship.dimension or 
+    #                 ny < 0 or ny >= self.ship.dimension or 
+    #                 self.ship.grid[nx, ny] == 1):
+    #                 blocked += 1
+    #     return blocked
     
     def sense_blocked_neighbors(self):
         """Sense action - count blocked neighbors in current cell"""
         self.actions_taken['sensing'] += 1
-        count = self.count_blocked_neighbors(self.current_location)
+        count = self.ship.get_cell(self.current_location.row, self.current_location.col).count_blocked_neighbors()
         self.last_action = f"Sensed {count} blocked neighbors"
         return count
     
@@ -78,12 +78,12 @@ class Bot:
     
     def manhattan_distance(self, cell1, cell2):
         """Calculate Manhattan distance between two cells"""
-        return abs(cell1[0] - cell2[0]) + abs(cell1[1] - cell2[1])
+        return abs(cell1.row - cell2.row) + abs(cell1.col - cell2.col)
     
     def attempt_move(self, direction):
         """Attempt to move in one of 8 directions"""
         self.actions_taken['movements'] += 1
-        x, y = self.current_location
+        x, y = self.current_location.row, self.current_location.col
         
         if direction == Direction.NORTH:
             new_x, new_y = x - 1, y
@@ -105,7 +105,7 @@ class Bot:
         # Check if move is valid
         if (0 <= new_x < self.ship.dimension and 
             0 <= new_y < self.ship.dimension and 
-            self.ship.grid[new_x, new_y] == 0):
+            self.ship.get_cell(new_x, new_y).is_open()):
             self.current_location = (new_x, new_y)  # This is the critical update
             self.path.append(self.current_location)
             self.visited.add(self.current_location)
@@ -116,22 +116,23 @@ class Bot:
         """Find direction most commonly open among possible locations"""
         direction_counts = {d: 0 for d in Direction}
         
-        for (x, y) in possible_locations:
-            if x > 0 and self.ship.grid[x-1, y] == 0:
+        for cell in possible_locations:
+            x, y = cell.row, cell.col
+            if x > 0 and self.ship.get_cell(x-1, y).is_open():
                 direction_counts[Direction.NORTH] += 1
-            if x > 0 and y < self.ship.dimension-1 and self.ship.grid[x-1, y+1] == 0:
+            if x > 0 and y < self.ship.dimension-1 and self.ship.get_cell(x-1, y+1).is_open():
                 direction_counts[Direction.NORTHEAST] += 1
-            if y < self.ship.dimension-1 and self.ship.grid[x, y+1] == 0:
+            if y < self.ship.dimension-1 and self.ship.get_cell(x, y+1).is_open():
                 direction_counts[Direction.EAST] += 1
-            if x < self.ship.dimension-1 and y < self.ship.dimension-1 and self.ship.grid[x+1, y+1] == 0:
+            if x < self.ship.dimension-1 and y < self.ship.dimension-1 and self.ship.get_cell(x+1, y+1).is_open():
                 direction_counts[Direction.SOUTHEAST] += 1
-            if x < self.ship.dimension-1 and self.ship.grid[x+1, y] == 0:
+            if x < self.ship.dimension-1 and self.ship.get_cell(x+1, y).is_open():
                 direction_counts[Direction.SOUTH] += 1
-            if x < self.ship.dimension-1 and y > 0 and self.ship.grid[x+1, y-1] == 0:
+            if x < self.ship.dimension-1 and y > 0 and self.ship.get_cell(x+1, y-1).is_open():
                 direction_counts[Direction.SOUTHWEST] += 1
-            if y > 0 and self.ship.grid[x, y-1] == 0:
+            if y > 0 and self.ship.get_cell(x, y-1).is_open():
                 direction_counts[Direction.WEST] += 1
-            if x > 0 and y > 0 and self.ship.grid[x-1, y-1] == 0:
+            if x > 0 and y > 0 and self.ship.get_cell(x-1, y-1).is_open():
                 direction_counts[Direction.NORTHWEST] += 1
         
         max_count = max(direction_counts.values())
@@ -142,8 +143,10 @@ class Bot:
         """Update possible locations based on sensed blocked neighbors"""
         new_possible = []
         for cell in self.possible_locations:
-            if self.count_blocked_neighbors(cell) == sensed_blocked:
+            if cell.count_blocked_neighbors() == sensed_blocked:
                 new_possible.append(cell)
+            # if self.count_blocked_neighbors(cell) == sensed_blocked:
+            #     new_possible.append(cell)
         
         if new_possible:
             self.possible_locations = new_possible
@@ -153,30 +156,30 @@ class Bot:
     def update_location_after_move(self, direction, move_success):
         """Update possible locations after attempted move"""
         new_possible = []
-        for (x, y) in self.possible_locations:
+        for cell in self.possible_locations:
             can_move = False
             if direction == Direction.NORTH:
-                can_move = x > 0 and self.ship.grid[x-1, y] == 0
+                can_move = cell.row > 0 and self.ship.get_cell(cell.row, cell.col).is_open()
             elif direction == Direction.NORTHEAST:
-                can_move = (x > 0 and y < self.ship.dimension-1 and 
-                           self.ship.grid[x-1, y+1] == 0)
+                can_move = (cell.row > 0 and cell.col < self.ship.dimension-1 and 
+                           self.ship.get_cell(cell.row-1, cell.col+1).is_open())
             elif direction == Direction.EAST:
-                can_move = y < self.ship.dimension-1 and self.ship.grid[x, y+1] == 0
+                can_move = cell.col < self.ship.dimension-1 and self.ship.get_cell(cell.row, cell.col+1).is_open()
             elif direction == Direction.SOUTHEAST:
-                can_move = (x < self.ship.dimension-1 and y < self.ship.dimension-1 and 
-                           self.ship.grid[x+1, y+1] == 0)
+                can_move = (cell.row < self.ship.dimension-1 and cell.col < self.ship.dimension-1 and 
+                           self.ship.get_cell(cell.row+1, cell.col+1).is_open())
             elif direction == Direction.SOUTH:
-                can_move = x < self.ship.dimension-1 and self.ship.grid[x+1, y] == 0
+                can_move = cell.row < self.ship.dimension-1 and self.ship.get_cell(cell.row+1, cell.col).is_open()
             elif direction == Direction.SOUTHWEST:
-                can_move = (x < self.ship.dimension-1 and y > 0 and 
-                           self.ship.grid[x+1, y-1] == 0)
+                can_move = (cell.row < self.ship.dimension-1 and cell.col > 0 and 
+                           self.ship.get_cell(cell.row+1, cell.col-1).is_open())
             elif direction == Direction.WEST:
-                can_move = y > 0 and self.ship.grid[x, y-1] == 0
+                can_move = cell.col > 0 and self.ship.get_cell(cell.row, cell.col-1).is_open()
             elif direction == Direction.NORTHWEST:
-                can_move = x > 0 and y > 0 and self.ship.grid[x-1, y-1] == 0
+                can_move = cell.row > 0 and cell.col > 0 and self.ship.get_cell(cell.row-1, cell.col-1).is_open()
             
             if (move_success and can_move) or (not move_success and not can_move):
-                new_possible.append((x, y))
+                new_possible.append(cell)
         
         if new_possible:
             self.possible_locations = new_possible
