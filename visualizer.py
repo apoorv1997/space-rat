@@ -2,6 +2,26 @@ import os
 import pygame
 
 
+# Constants
+SCREEN_WIDTH = 900
+SCREEN_HEIGHT = 700
+GRID_SIZE = 30
+CELL_SIZE = 20
+MARGIN = 50
+INFO_PANEL_HEIGHT = 150
+
+# Colors
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+GRAY = (200, 200, 200)
+RED = (255, 0, 0)
+GREEN = (0, 255, 0)
+BLUE = (0, 0, 255)
+YELLOW = (255, 255, 0)
+PURPLE = (128, 0, 128)
+ORANGE = (255, 165, 0)
+CYAN = (0, 255, 255)
+
 class Visualizer:
     """A class for visualizing the ship grid and the robot's actions"""
 
@@ -29,34 +49,13 @@ class Visualizer:
         # self.robot_image = pygame.transform.smoothscale(self.robot_image, (desired_size, desired_size))
 
 
-    def draw_grid(self, ship, cell_size, env=None):
-        """Draws the ship grid and overlays the fire, the button, and (if active) the robot"""
-
-        if not pygame.display.get_init() or self.screen is None:
-            # Reinitialize the display surface based on saved dimensions.
-            self.screen = pygame.display.set_mode((self.width, self.height))
-        self.screen.fill((0, 0, 0))
-
-        for row in range(self.ship.dimension):
-            for col in range(self.ship.dimension):
-                # Draw each cell in the grid
-                print(row, col)
-                cell = self.ship.get_cell(row, col)
-                rect = pygame.Rect(col * self.cell_size, row * self.cell_size, self.cell_size, self.cell_size)
-                bg_color = (255, 255, 255) if cell else (0, 0, 0)  # white if open, black if blocked
-                pygame.draw.rect(self.screen, bg_color, rect)  # draw cell fill color
-                pygame.draw.rect(self.screen, (200, 200, 200), rect, 1)  # draw cell border
-
-                if self.env is not None:  # color button cell blue
-                    pygame.draw.rect(self.screen, (0, 0, 255), rect)
-                    pygame.draw.rect(self.screen, (200, 200, 200), rect, 1)
-
-                # # Draw robot image if the bot is active and on this cell
-                # if self.bot is not None and self.bot.cell.row == row and self.bot.cell.col == col:
-                #     ew, eh = self.robot_image.get_size()
-                #     ex = col * self.cell_size + (self.cell_size - ew) // 2  # center x
-                #     ey = row * self.cell_size + (self.cell_size - eh) // 2  # center y
-                #     self.screen.blit(self.robot_image, (ex, ey))  # draw robot image
+    def draw_ship(screen, ship):
+        """Draw the ship layout"""
+        for i in range(ship.dimension):
+            for j in range(ship.dimension):
+                color = BLACK if ship.grid[i, j] == 1 else WHITE
+                pygame.draw.rect(screen, color, (MARGIN + j * CELL_SIZE, MARGIN + i * CELL_SIZE, CELL_SIZE, CELL_SIZE))
+                pygame.draw.rect(screen, GRAY, (MARGIN + j * CELL_SIZE, MARGIN + i * CELL_SIZE, CELL_SIZE, CELL_SIZE), 1)
 
         pygame.display.flip()  # update display
 
@@ -101,51 +100,82 @@ class Visualizer:
                 break
         pygame.quit()
 
-    def draw_grid_with_algorithmic_robot(self, controller, realtime, tick_interval):
-        """
-        Runs simulation in algorithmic mode
-        realtime: if True, run simulation in real time
-        tick_interval: time between ticks in seconds
-        controller: BotController object
-        """
-        running = True
-        clock = pygame.time.Clock()
-        simulation_result = "ongoing"
+    def draw_bot(screen, bot):
+        """Draw the bot and its possible locations"""
+        # Draw possible locations during localization
+        if not bot.localized:
+            for (i, j) in bot.possible_locations:
+                pygame.draw.rect(screen, CYAN, (MARGIN + j * CELL_SIZE + 5, MARGIN + i * CELL_SIZE + 5, CELL_SIZE - 10, CELL_SIZE - 10))
+        
+        # Draw current location
+        if bot.current_location:
+            i, j = bot.current_location
+            pygame.draw.rect(screen, BLUE, (MARGIN + j * CELL_SIZE + 2, MARGIN + i * CELL_SIZE + 2, CELL_SIZE - 4, CELL_SIZE - 4))
+            
+            # Draw path
+            for idx, (pi, pj) in enumerate(bot.path):
+                alpha = min(255, 50 + idx * 2)  # Fade out older path segments
+                path_color = (0, 0, 255, alpha)
+                path_surface = pygame.Surface((CELL_SIZE - 6, CELL_SIZE - 6), pygame.SRCALPHA)
+                path_surface.fill(path_color)
+                screen.blit(path_surface, (MARGIN + pj * CELL_SIZE + 3, MARGIN + pi * CELL_SIZE + 3))
 
-        while running and simulation_result == "ongoing":
-            # Bot takes action, updating ship environment as needed before updating the grid
-            simulation_result = controller.make_action()
-            self.draw_grid()
-            if realtime:
-                clock.tick(1 / tick_interval)
-            for event in pygame.event.get():
-                # Check for quit event.
-                if event.type == pygame.QUIT:
-                    running = False
 
-        if simulation_result == "failure":
-            print("Robot failed!")
-        elif simulation_result == "success":
-            print("Robot succeeded!")
+    def draw_rat(screen, rat_location, detected=False):
+        """Draw the rat"""
+        if rat_location:
+            i, j = rat_location
+            color = RED if detected else PURPLE
+            pygame.draw.circle(screen, color, (MARGIN + j * CELL_SIZE + CELL_SIZE // 2, MARGIN + i * CELL_SIZE + CELL_SIZE // 2), CELL_SIZE // 3)
 
-        # Display static terminal state
-        self.draw_static_grid()
 
-    def draw_grid_with_interactive_robot(self, controller):
-        """
-        Runs simulation in manual mode
-        """
-        running = True
-        clock = pygame.time.Clock() # for controlling frame rate
-        simulation_result = "ongoing"
-        while running and simulation_result == "ongoing":
-            # Wait for user input to move the bot, updating the ship environment as needed before updating the grid
-            simulation_result = controller.make_action()
-            self.draw_grid()
-            clock.tick(30) # 30 FPS
-        if simulation_result == "failure":
-            print("Robot failed!")
-        elif simulation_result == "success":
-            print("Robot succeeded!")
-        # Display static terminal state.
-        self.draw_static_grid()
+    def draw_probability_heatmap(screen, bot):
+        """Draw a heatmap of rat probabilities"""
+        if not bot.localized:
+            return
+        
+        max_prob = max(bot.rat_probabilities.values()) if bot.rat_probabilities else 1
+        for (i, j), prob in bot.rat_probabilities.items():
+            if prob > 0:
+                intensity = int(255 * (prob / max_prob))
+                color = (255, 255 - intensity, 0)  # Yellow to red gradient
+                pygame.draw.rect(screen, color, (MARGIN + j * CELL_SIZE + 8, MARGIN + i * CELL_SIZE + 8, CELL_SIZE - 16, CELL_SIZE - 16))      
+    
+
+    def draw_info_panel(screen, bot, font, alpha):
+        """Draw the information panel at the bottom"""
+        pygame.draw.rect(screen, WHITE, (0, SCREEN_HEIGHT - INFO_PANEL_HEIGHT, SCREEN_WIDTH, INFO_PANEL_HEIGHT))
+        
+        # Draw phase information
+        phase_text = font.render(f"Phase: {bot.phase}", True, BLACK)
+        screen.blit(phase_text, (20, SCREEN_HEIGHT - INFO_PANEL_HEIGHT + 20))
+        
+        # Draw last action
+        action_text = font.render(f"Last Action: {bot.last_action}", True, BLACK)
+        screen.blit(action_text, (20, SCREEN_HEIGHT - INFO_PANEL_HEIGHT + 50))
+        
+        # Draw action counts
+        counts_text = font.render(
+            f"Movements: {bot.actions_taken['movements']} | "
+            f"Sensing: {bot.actions_taken['sensing']} | "
+            f"Detection: {bot.actions_taken['detection']}", 
+            True, BLACK)
+        screen.blit(counts_text, (20, SCREEN_HEIGHT - INFO_PANEL_HEIGHT + 80))
+        
+        # Draw alpha value
+        alpha_text = font.render(f"Alpha (sensitivity): {alpha:.2f}", True, BLACK)
+        screen.blit(alpha_text, (20, SCREEN_HEIGHT - INFO_PANEL_HEIGHT + 110))
+        
+        # Draw legend
+        legend = [
+            ("Bot", BLUE),
+            ("Rat", PURPLE),
+            ("Caught Rat", RED),
+            ("Possible Locations", CYAN),
+            ("Rat Probability", ORANGE)
+        ]
+        
+        for idx, (text, color) in enumerate(legend):
+            pygame.draw.rect(screen, color, (SCREEN_WIDTH - 150, SCREEN_HEIGHT - INFO_PANEL_HEIGHT + 20 + idx * 25, 15, 15))
+            legend_text = font.render(text, True, BLACK)
+            screen.blit(legend_text, (SCREEN_WIDTH - 130, SCREEN_HEIGHT - INFO_PANEL_HEIGHT + 20 + idx * 25))

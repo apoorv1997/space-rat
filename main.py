@@ -28,35 +28,41 @@ CYAN = (0, 255, 255)
 
 def draw_ship(screen, ship):
     """Draw the ship layout"""
-    for i in range(ship.dimension):
-        for j in range(ship.dimension):
-            color = BLACK if ship.grid[i, j] == 1 else WHITE
+    for row in ship.grid:
+        for cell in row:
+            # Determine the color of the cell based on its state
+            color = WHITE if not cell.open else BLACK
             pygame.draw.rect(screen, color, 
-                            (MARGIN + j * CELL_SIZE, 
-                             MARGIN + i * CELL_SIZE, 
+                            (MARGIN + cell.col * CELL_SIZE, 
+                             MARGIN + cell.row * CELL_SIZE, 
                              CELL_SIZE, CELL_SIZE))
+            # Draw grid lines
             pygame.draw.rect(screen, GRAY, 
-                            (MARGIN + j * CELL_SIZE, 
-                             MARGIN + i * CELL_SIZE, 
+                            (MARGIN + cell.col * CELL_SIZE, 
+                             MARGIN + cell.row * CELL_SIZE, 
                              CELL_SIZE, CELL_SIZE), 1)
 
 def draw_bot(screen, bot):
     """Draw the bot and its possible locations"""
     if not bot.localized:
-        for (i, j) in bot.possible_locations:
+        for cell in bot.possible_locations:
+            i, j = cell.row, cell.col
             pygame.draw.rect(screen, CYAN, 
                            (MARGIN + j * CELL_SIZE + 5, 
                             MARGIN + i * CELL_SIZE + 5, 
                             CELL_SIZE - 10, CELL_SIZE - 10))
     
     if bot.current_location:
-        i, j = bot.current_location
+        print(f" cell value {bot.current_location}")
+        print(f"cell type {dir(bot.current_location)}")
+        i, j = bot.current_location.row, bot.current_location.col
         pygame.draw.rect(screen, BLUE, 
                         (MARGIN + j * CELL_SIZE + 2, 
                          MARGIN + i * CELL_SIZE + 2, 
                          CELL_SIZE - 4, CELL_SIZE - 4))
         
-        for idx, (pi, pj) in enumerate(bot.path):
+        for idx, cell in enumerate(bot.path):
+            pi, pj = cell.row, cell.col
             alpha = min(255, 50 + idx * 2)
             path_color = (0, 0, 255, alpha)
             path_surface = pygame.Surface((CELL_SIZE - 6, CELL_SIZE - 6), pygame.SRCALPHA)
@@ -68,7 +74,7 @@ def draw_bot(screen, bot):
 def draw_rat(screen, rat_location, detected=False):
     """Draw the rat"""
     if rat_location:
-        i, j = rat_location
+        i, j = rat_location.row, rat_location.col
         color = RED if detected else PURPLE
         pygame.draw.circle(screen, color, 
                           (MARGIN + j * CELL_SIZE + CELL_SIZE // 2, 
@@ -81,8 +87,9 @@ def draw_probability_heatmap(screen, bot):
         return
     
     max_prob = max(bot.rat_probabilities.values()) if bot.rat_probabilities else 1
-    for (i, j), prob in bot.rat_probabilities.items():
+    for cell, prob in bot.rat_probabilities.items():
         if prob > 0:
+            i, j = cell.row, cell.col
             intensity = int(255 * (prob / max_prob))
             color = (255, 255 - intensity, 0)
             pygame.draw.rect(screen, color, 
