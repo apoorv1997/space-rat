@@ -3,6 +3,7 @@ import numpy as np
 from heapq import heappush, heappop
 import math
 import random
+from cell import Cell
 from directions import Direction
 
 class Bot:
@@ -106,7 +107,8 @@ class Bot:
         if (0 <= new_x < self.ship.dimension and 
             0 <= new_y < self.ship.dimension and 
             self.ship.get_cell(new_x, new_y).is_open()):
-            self.current_location = (new_x, new_y)  # This is the critical update
+            self.current_location = Cell(new_x, new_y)
+            # self.current_location = (new_x, new_y)  # This is the critical update
             self.path.append(self.current_location)
             self.visited.add(self.current_location)
             return True
@@ -217,7 +219,7 @@ class Bot:
     def find_shortest_path(self, start, target):
         """A* pathfinding algorithm to find shortest path to target"""
         def heuristic(a, b):
-            return abs(a[0] - b[0]) + abs(a[1] - b[1])
+            return abs(a.row - b.row) + abs(a.col - b.col)
 
         frontier = []
         heappush(frontier, (0, start))
@@ -231,10 +233,10 @@ class Bot:
                 break
 
             for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0), (1, 1), (-1, 1), (1, -1), (-1, -1)]:
-                neighbor = (current[0] + dx, current[1] + dy)
-                if (0 <= neighbor[0] < self.ship.dimension and 
-                    0 <= neighbor[1] < self.ship.dimension and 
-                    self.ship.grid[neighbor[0], neighbor[1]] == 0):
+                neighbor = Cell(current.row + dx, current.col + dy)
+                if (0 <= neighbor.row < self.ship.dimension and 
+                    0 <= neighbor.col < self.ship.dimension and 
+                    self.ship.get_cell(neighbor.row, neighbor.col).is_open()):
                     new_cost = cost_so_far[current] + 1
                     if neighbor not in cost_so_far or new_cost < cost_so_far[neighbor]:
                         cost_so_far[neighbor] = new_cost
