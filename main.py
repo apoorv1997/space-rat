@@ -2,6 +2,7 @@ import sys
 import random
 from bot import Bot
 import pygame
+from interestingbot import InterestingBot
 from ship import Ship
 import numpy as np
 import matplotlib.pyplot as plt
